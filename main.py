@@ -9,19 +9,19 @@ tasks = [
     {"id": 3, "title": "Learn FastAPI", "done": True},
 ]
 
-@app.get("/")
+@app.get("/", summary="API Information")
 def root():
     return {"name": "Task API", "version": "1.0", "endpoints": ["/tasks"]}
 
-@app.get("/health")
+@app.get("/health", summary="Health Check")
 def health():
     return {"status": "ok"}
 
-@app.get("/tasks")
+@app.get("/tasks", summary="List all tasks")
 def get_tasks():
     return tasks
 
-@app.get("/tasks/{task_id}")
+@app.get("/tasks/{task_id}", summary="Get a single task by id")
 def get_task(task_id: int):
     for task in tasks:
         if task["id"] == task_id:
@@ -31,7 +31,7 @@ def get_task(task_id: int):
 class TaskCreate(BaseModel):
     title: str = " "
 
-@app.post("/tasks", status_code=201)
+@app.post("/tasks", status_code=201, summary="Create a new task")
 def create_task(new_task: TaskCreate):
     if not new_task.title.strip():
         raise HTTPException(status_code=400, detail="Title is required")
@@ -45,7 +45,7 @@ class TaskUpdate(BaseModel):
     title: str = None
     done: bool = None
 
-@app.put("/tasks/{task_id}")
+@app.put("/tasks/{task_id}", summary="Update an existing task")
 def update_task(task_id: int, updated: TaskUpdate):
     for task in tasks:
         if task["id"] == task_id:
@@ -60,7 +60,7 @@ def update_task(task_id: int, updated: TaskUpdate):
             return task
     raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
-@app.delete("/tasks/{task_id}", status_code=204)
+@app.delete("/tasks/{task_id}", status_code=204, summary="Delete a task")
 def delete_task(task_id: int):
     for task in tasks:
         if task["id"] == task_id:
