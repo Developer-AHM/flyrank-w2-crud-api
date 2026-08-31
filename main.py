@@ -4,7 +4,7 @@ import sqlite3
 
 app = FastAPI()
 
-conn = sqlite3.connect("tasks.db")
+conn = sqlite3.connect("tasks.db", check_same_thread=False)
 cursor = conn.cursor()
 
 cursor.execute("""
@@ -41,14 +41,25 @@ def health():
 
 @app.get("/tasks", summary="List all tasks")
 def get_tasks():
-    return tasks
+    cursor.execute("SELECT * FROM tasks")
+    rows = cursor.fetchall()
+
+    result = []
+    for row in rows:
+        task = {"id:": row[0], "title:": row[1], "done": bool(row[2])}
+        result.append(task)
+
+    return result
 
 @app.get("/tasks/{task_id}", summary="Get a single task by id")
 def get_task(task_id: int):
-    for task in tasks:
-        if task["id"] == task_id:
-            return task
-    raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+    cursor.execute("SELECT * FROM tasks WHERE id= ?", (task_id,))
+    row = cursor.fetchone()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+
+    return {"id": row[0], "title":row[1], "done": bool(row[2])}
 
 class TaskCreate(BaseModel):
     title: str = " "
