@@ -46,7 +46,7 @@ def get_tasks():
 
     result = []
     for row in rows:
-        task = {"id:": row[0], "title:": row[1], "done": bool(row[2])}
+        task = {"id": row[0], "title": row[1], "done": bool(row[2])}
         result.append(task)
 
     return result
@@ -69,9 +69,10 @@ def create_task(new_task: TaskCreate):
     if not new_task.title.strip():
         raise HTTPException(status_code=400, detail="Title is required")
 
-    next_id = max(task["id"] for task in tasks) + 1
-    task = {"id": next_id, "title": new_task.title, "done": False}
-    tasks.append(task)
+    cursor.execute("INSERT INTO tasks (title, done) VALUES (?, ?)", (new_task.title, 0))
+    conn.commit()
+    new_id = cursor.lastrowid
+    task = {"id": new_id, "title": new_task.title, "done": False}
     return task
 
 class TaskUpdate(BaseModel):
