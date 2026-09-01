@@ -40,8 +40,12 @@ def health():
     return {"status": "ok"}
 
 @app.get("/tasks", summary="List all tasks")
-def get_tasks():
-    cursor.execute("SELECT * FROM tasks")
+def get_tasks(search: str = None):
+    if search is not None:
+        cursor.execute("SELECT * FROM tasks WHERE title LIKE ?", ("%" + search + "%",))
+    else:
+        cursor.execute("SELECT * FROM tasks")
+
     rows = cursor.fetchall()
 
     result = []
