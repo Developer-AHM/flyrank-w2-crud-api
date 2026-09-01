@@ -81,23 +81,33 @@ class TaskUpdate(BaseModel):
 
 @app.put("/tasks/{task_id}", summary="Update an existing task")
 def update_task(task_id: int, updated: TaskUpdate):
-    for task in tasks:
-        if task["id"] == task_id:
-            if updated.title is not None:
-                if not updated.title.strip():
-                    raise HTTPException(status_code=400, detail="Title cannot be empty")
-                task["title"] = updated.title
+    cursor.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
+    row = cursor.fetchone()
 
-            if updated.done is not None:
-                task["done"] = updated.done
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
-            return task
-    raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+    new_title = updated.title if updated.title is not None else row[1]
+    new_done = updated.done if updated.done is not None else bool(row[2])
 
+    if updated.title is not None and not updated.title.strip():
+        raise HTTPException(status_code=400, detail="Title cannont be empty")
+
+    cursor.execute("UPDATE tasks SET title = ?, done = ? WHERE id = ?", (new_title, int(new_done), task_id))
+    conn.commit()
+
+    return {"id": task_id, "title": new_title, "done": new_done}
+
+
+            
 @app.delete("/tasks/{task_id}", status_code=204, summary="Delete a task")
 def delete_task(task_id: int):
-    for task in tasks:
-        if task["id"] == task_id:
-            tasks.remove(task)
-            return
-    raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+    cursor.execute("SELECT * FROM tasks WHERE id = ? ", (task_id,))
+    row = cursor.fetchone()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+
+    cursor.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+    conn.commit()
+    return
