@@ -78,9 +78,9 @@ def create_task(new_task: TaskCreate):
     if not new_task.title.strip():
         raise HTTPException(status_code=400, detail="Title is required")
 
-    cursor.execute("INSERT INTO tasks (title, done) VALUES (?, ?)", (new_task.title, 0))
+    cursor.execute("INSERT INTO tasks (title, done) VALUES (%s, %s) RETURNING id", (new_task.title, False))
+    new_id = cursor.fetchone()[0]
     conn.commit()
-    new_id = cursor.lastrowid
     task = {"id": new_id, "title": new_task.title, "done": False}
     return task
 
@@ -90,7 +90,7 @@ class TaskUpdate(BaseModel):
 
 @app.put("/tasks/{task_id}", summary="Update an existing task")
 def update_task(task_id: int, updated: TaskUpdate):
-    cursor.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
+    cursor.execute("SELECT * FROM tasks WHERE id = %s", (task_id,))
     row = cursor.fetchone()
 
     if row is None:
@@ -102,7 +102,7 @@ def update_task(task_id: int, updated: TaskUpdate):
     if updated.title is not None and not updated.title.strip():
         raise HTTPException(status_code=400, detail="Title cannont be empty")
 
-    cursor.execute("UPDATE tasks SET title = ?, done = ? WHERE id = ?", (new_title, int(new_done), task_id))
+    cursor.execute("UPDATE tasks SET title = %s, done = %s WHERE id = %s", (new_title, new_done, task_id))
     conn.commit()
 
     return {"id": task_id, "title": new_title, "done": new_done}
@@ -111,12 +111,12 @@ def update_task(task_id: int, updated: TaskUpdate):
             
 @app.delete("/tasks/{task_id}", status_code=204, summary="Delete a task")
 def delete_task(task_id: int):
-    cursor.execute("SELECT * FROM tasks WHERE id = ? ", (task_id,))
+    cursor.execute("SELECT * FROM tasks WHERE id = %s ", (task_id,))
     row = cursor.fetchone()
 
     if row is None:
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
-    cursor.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+    cursor.execute("DELETE FROM tasks WHERE id = %s", (task_id,))
     conn.commit()
     return
