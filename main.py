@@ -47,7 +47,7 @@ def health():
 @app.get("/tasks", summary="List all tasks")
 def get_tasks(search: str = None):
     if search is not None:
-        cursor.execute("SELECT * FROM tasks WHERE title LIKE ?", ("%" + search + "%",))
+        cursor.execute("SELECT * FROM tasks WHERE title LIKE %s", ("%" + search + "%",))
     else:
         cursor.execute("SELECT * FROM tasks")
 
@@ -62,7 +62,7 @@ def get_tasks(search: str = None):
 
 @app.get("/tasks/{task_id}", summary="Get a single task by id")
 def get_task(task_id: int):
-    cursor.execute("SELECT * FROM tasks WHERE id= ?", (task_id,))
+    cursor.execute("SELECT * FROM tasks WHERE id= %s", (task_id,))
     row = cursor.fetchone()
 
     if row is None:
