@@ -97,7 +97,19 @@ docker compose down   # containers removed
 docker compose up     # fresh containers, same data — the volume kept it
 ```
 
-## Viewing the database directly
+## Exploring with SQLite (Week 3)
+
+Before moving to Postgres, the database was explored directly using SQLite's command-line tool:
+
+```sql
+UPDATE tasks SET done = 1;
+```
+
+This marked every task as completed. Calling `GET /tasks` through the API immediately afterward reflected the change, with no restart needed — proof the API and the database file were always in sync.
+
+![SQLite terminal session](sqlite-terminal.png)
+
+## Viewing the database directly (Postgres)
 
 ```bash
 docker exec -it $(docker compose ps -q db) psql -U postgres -d tasks -c "SELECT * FROM tasks;"
