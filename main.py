@@ -126,3 +126,34 @@ def delete_task(task_id: int):
     cursor.execute("DELETE FROM tasks WHERE id = %s", (task_id,))
     conn.commit()
     return
+
+class SignupRequest(BaseModel):
+    email: str = ""
+    password: str = ""
+
+@app.post("/auth/signup", status_code=201, summary="Create a new user account")
+def signup(request: SignupRequest):
+    if not request.email.strip() or not request.password.strip():
+        raise HTTPException(status_code=400, detail="Email and password are required")
+
+    response = supabase.auth.sign_up({"email": request.email, "password": request.password})
+    return response.user
+
+class LoginRequest(BaseModel):
+    email: str = ""
+    password: str = ""
+
+@app.post("/auth/login", summary="Authenticate and return a JWT")
+def login(request: LoginRequest):
+    if not request.email.strip() or not request.password.strip():
+        raise HTTPException(status_code=400, detail="Email and password are required")
+
+    try:
+        response = supabase.auth.sign_in_with_password({"email": request.email, "password": request.password})
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid login credentials")
+
+    return {
+        "access_token": response.session.access_token,
+        "refresh_token": response.session.refresh_token
+    }
