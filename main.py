@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException, Header, Depends
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from supabase import create_client
@@ -143,6 +143,19 @@ class LoginRequest(BaseModel):
     email: str = ""
     password: str = ""
 
+def get_current_user(authorization: str = Header(None)):
+    if authorization is None or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Access token required")
+
+    token = authorization.replace("Bearer ", "")
+
+    try:
+        response = supabase.auth.get_user(token)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    return response.user
+
 @app.post("/auth/login", summary="Authenticate and return a JWT")
 def login(request: LoginRequest):
     if not request.email.strip() or not request.password.strip():
@@ -162,21 +175,19 @@ def login(request: LoginRequest):
 def public_info():
     return {"message": "Welcome stranger! This info is public."}
 
-@app.get("/protected/profile", summary="Protected profile route (token presence only)")
-def protected_profile(authorization: str = Header(None)):
-    if authorization is None or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Access token required")
-
-    token = authorization.replace("Bearer ", "")
-
-    try:
-        response = supabase.auth.get_user(token)
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user = response.user
+@app.get("/protected/profile", summary="Protected profile route")
+def protected_profile(user = Depends(get_current_user)):
     return {
         "id": user.id,
         "email": user.email,
         "created_at": user.created_at
     }
+
+@app.post("/auth/logout", status_code=204, summary="Log out the current user")
+def logout(user = Depends(get_current_user)):
+    supabase.auth.sign_out()
+    return
+
+@app.get("/protected/dashboard", summary="Another protected route, reusing the same guard")
+def protected_dashboard(user = Depends(get_current_user)):
+    return {"message": f"Welcome to your dashboard, {user.email}"}
