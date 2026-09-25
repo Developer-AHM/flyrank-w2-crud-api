@@ -1,20 +1,22 @@
 # Task API
 
-A simple CRUD (Create, Read, Update, Delete) API for managing a to-do list, built with **Python** and **FastAPI**.
+A simple CRUD (Create, Read, Update, Delete) API for managing a to-do list, built with **Python** and **FastAPI**. Now secured with real user authentication via Supabase Auth.
 
 This project was completed as part of my **Backend AI Engineer internship at FlyRank**.
 
 - **Week 2 (A1):** Built the initial CRUD API with in-memory storage.
 - **Week 3 (A2):** Migrated storage to a SQLite database — same endpoints, now persistent.
 - **Week 1 (A3):** Containerized the whole stack with Docker — the API and a real PostgreSQL database now run together with one command.
+- **Week 2 (A4):** Added authentication with Supabase Auth — signup, login, logout, and protected routes guarded by JWT verification.
 
 ## Tech stack
 
 - **Language:** Python 3.12
 - **Framework:** FastAPI
 - **Database:** PostgreSQL 16 (containerized)
+- **Authentication:** Supabase Auth (JWT-based)
 - **Containerization:** Docker + Docker Compose
-- **Docs:** Swagger UI (built in at `/docs`)
+- **Docs:** Swagger UI with Bearer auth support (built in at `/docs`)
 
 ## How to run (one command)
 
@@ -25,72 +27,77 @@ cp .env.example .env
 docker compose up
 ```
 
-That's it — this single command builds the API image, starts a PostgreSQL container, connects them together, and creates + seeds the `tasks` table automatically on first run.
+Then edit `.env` and fill in your own Supabase project URL and anon key (see below).
 
 The API is available at `http://localhost:8000`.
 Interactive API docs (Swagger UI): `http://localhost:8000/docs`
 
-To stop everything:
-```bash
-docker compose down
-```
-(Your data stays safe in a Docker volume even after this — see "Persistence" below.)
-
 ## Environment variables
 
-Copy `.env.example` to `.env` and adjust if needed:
+Copy `.env.example` to `.env` and fill in your own values:
 
 ```
 DATABASE_URL=postgres://postgres:yourpassword@localhost:5432/tasks
 POSTGRES_PASSWORD=yourpassword
+SUPABASE_URL=your_project_url
+SUPABASE_KEY=your_anon_key
+PORT=8000
 ```
 
-`.env` is git-ignored — never commit real credentials. `.env.example` shows the required keys with placeholder values.
+To get your own Supabase values: create a free project at [supabase.com](https://supabase.com), then go to **Project Settings → API** and copy your **Project URL** and **anon public key**. Never use the `service_role` key here.
 
-## Why Docker + Postgres
+`.env` is git-ignored — never commit real credentials. `.env.example` shows the required keys with placeholder values only.
 
-SQLite (Week 3) was a single file — simple, but not how most real backends store data. PostgreSQL is a full database *server*, the same kind of engine powering most production applications. Running it in Docker means no manual installation or version conflicts — Postgres runs identically on any machine with Docker installed. Docker Compose then ties the API and database together, so the entire stack starts with one command instead of two separate manual steps.
+## Why Supabase Auth
+
+Rolling your own authentication — password hashing, token signing, session management — is a common source of real security vulnerabilities. Supabase acts as a trusted Identity Provider: it stores accounts, hashes passwords, and issues signed JWTs. This API never touches a raw password; it only forwards credentials to Supabase and verifies the tokens Supabase issues.
 
 ## Endpoints
 
-| Method | Path            | Description                          | Success | Error |
-|--------|-----------------|---------------------------------------|---------|-------|
-| GET    | `/`             | API info (name, version, endpoints)   | 200     | —     |
-| GET    | `/health`       | Health check                          | 200     | —     |
-| GET    | `/tasks`        | List all tasks (optional `?search=`)  | 200     | —     |
-| GET    | `/tasks/{id}`   | Get a single task by id               | 200     | 404 if not found |
-| POST   | `/tasks`        | Create a new task                     | 201     | 400 if title is missing/empty |
-| PUT    | `/tasks/{id}`   | Update a task's title and/or done     | 200     | 404 if not found, 400 if title invalid |
-| DELETE | `/tasks/{id}`   | Delete a task                         | 204     | 404 if not found |
+| Method | Path                   | Description                          | Auth required |
+|--------|------------------------|---------------------------------------|----------------|
+| GET    | `/`                    | API info                              | No |
+| GET    | `/health`              | Health check                          | No |
+| GET    | `/tasks`               | List all tasks (optional `?search=`)  | No |
+| GET    | `/tasks/{id}`          | Get a single task by id               | No |
+| POST   | `/tasks`               | Create a new task                     | No |
+| PUT    | `/tasks/{id}`          | Update a task                         | No |
+| DELETE | `/tasks/{id}`          | Delete a task                         | No |
+| POST   | `/auth/signup`         | Create a new user account             | No |
+| POST   | `/auth/login`          | Authenticate, returns a JWT           | No |
+| POST   | `/auth/logout`         | End the current session               | Yes (Bearer token) |
+| GET    | `/public/info`         | Public, open info                     | No |
+| GET    | `/protected/profile`   | Current user's profile                | Yes (Bearer token) |
+| GET    | `/protected/dashboard` | Example second protected route        | Yes (Bearer token) |
 
-### Example task object
+## Example auth flow (curl)
 
-```json
-{
-  "id": 1,
-  "title": "Buy milk",
-  "done": false
-}
+**Sign up:**
+```bash
+curl -i -X POST http://localhost:8000/auth/signup -H "Content-Type: application/json" -d '{"email":"you@example.com","password":"yourpassword"}'
 ```
 
-## Example request (curl)
+**Log in:**
+```bash
+curl -i -X POST http://localhost:8000/auth/login -H "Content-Type: application/json" -d '{"email":"you@example.com","password":"yourpassword"}'
+```
+Response includes an `access_token` — use it as a Bearer token for protected routes:
 
 ```bash
-curl -i -X POST http://localhost:8000/tasks -H "Content-Type: application/json" -d '{"title":"Buy milk"}'
+curl -i http://localhost:8000/protected/profile -H "Authorization: Bearer <your_access_token>"
 ```
 
-Response:
+A tampered or expired token correctly returns `401 Unauthorized`.
 
-```
-HTTP/1.1 201 Created
-content-type: application/json
+## Swagger UI with Bearer auth
 
-{"id":4,"title":"Buy milk","done":false}
-```
+Protected routes show a padlock icon in `/docs`. Click **"Authorize"**, paste an access token (no `Bearer ` prefix needed — Swagger adds it automatically), and every protected route's "Try it out" will use it.
+
+![Swagger UI with Bearer auth](swagger-auth-screenshot.png)
 
 ## Persistence
 
-Tasks are stored in a named Docker volume (`taskdata`), separate from the containers themselves. This means data survives even a full stack teardown:
+Tasks are stored in a named Docker volume (`taskdata`), separate from the containers themselves, surviving a full stack teardown:
 
 ```bash
 docker compose down   # containers removed
@@ -105,7 +112,7 @@ Before moving to Postgres, the database was explored directly using SQLite's com
 UPDATE tasks SET done = 1;
 ```
 
-This marked every task as completed. Calling `GET /tasks` through the API immediately afterward reflected the change, with no restart needed — proof the API and the database file were always in sync.
+Calling `GET /tasks` through the API immediately reflected the change, with no restart needed.
 
 ![SQLite terminal session](sqlite-terminal.png)
 
@@ -115,28 +122,21 @@ This marked every task as completed. Calling `GET /tasks` through the API immedi
 docker exec -it $(docker compose ps -q db) psql -U postgres -d tasks -c "SELECT * FROM tasks;"
 ```
 
-Screenshot of this:
-
 ![Postgres data](postgres-screenshot.png)
-
-## Swagger UI
-
-Every endpoint is documented and testable interactively at `/docs`.
-
-![Swagger UI](Swagger%20UI.png)
 
 ## Project structure
 
 ```
 task-api/
-├── main.py                  # All API code
-├── Dockerfile                # Builds the API's container image
-├── compose.yaml               # Defines the api + db services
-├── requirements.txt          # Python dependencies
-├── .env.example               # Template for required environment variables
-├── .gitignore                  # Excludes venv/, .env, tasks.db, cache files
-├── Swagger UI.png             # Swagger UI screenshot
-├── sqlite-terminal.png        # SQLite CLI exploration screenshot (Week 3)
-├── postgres-screenshot.png    # Postgres data screenshot (this week)
+├── main.py                       # All API code
+├── Dockerfile                     # Builds the API's container image
+├── compose.yaml                    # Defines the api + db services
+├── requirements.txt               # Python dependencies
+├── .env.example                    # Template for required environment variables
+├── .gitignore                       # Excludes venv/, .env, tasks.db, cache files
+├── Swagger UI.png                  # Swagger UI screenshot (Week 2)
+├── sqlite-terminal.png             # SQLite CLI exploration screenshot (Week 3)
+├── postgres-screenshot.png         # Postgres data screenshot (Week 1/A3)
+├── swagger-auth-screenshot.png     # Swagger Bearer auth screenshot (this week)
 └── README.md
 ```
