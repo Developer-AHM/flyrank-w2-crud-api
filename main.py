@@ -1,11 +1,14 @@
-from fastapi import FastAPI, HTTPException, Header, Depends
+from fastapi import FastAPI, HTTPException, Header, Depends, Security
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from supabase import create_client
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import os
 import psycopg
 
 app = FastAPI()
+
+bearer_scheme = HTTPBearer()
 
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -143,19 +146,6 @@ class LoginRequest(BaseModel):
     email: str = ""
     password: str = ""
 
-def get_current_user(authorization: str = Header(None)):
-    if authorization is None or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Access token required")
-
-    token = authorization.replace("Bearer ", "")
-
-    try:
-        response = supabase.auth.get_user(token)
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    return response.user
-
 @app.post("/auth/login", summary="Authenticate and return a JWT")
 def login(request: LoginRequest):
     if not request.email.strip() or not request.password.strip():
@@ -170,6 +160,16 @@ def login(request: LoginRequest):
         "access_token": response.session.access_token,
         "refresh_token": response.session.refresh_token
     }
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Security(bearer_scheme)):
+    token = credentials.credentials
+
+    try:
+        response = supabase.auth.get_user(token)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    return response.user
 
 @app.get("/public/info", summary="Public info, no auth required")
 def public_info():
