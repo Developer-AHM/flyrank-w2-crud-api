@@ -48,7 +48,15 @@ To get your own Supabase values: create a free project at [supabase.com](https:/
 
 `.env` is git-ignored — never commit real credentials. `.env.example` shows the required keys with placeholder values only.
 
-## Why Supabase Auth
+## Why SQLite (Week 3)
+
+SQLite was chosen because it's a single file with zero setup — no separate database server to install or run. This was a natural first step from in-memory storage: data survived a server restart, while the project stayed just as simple to run.
+
+## Why Docker + Postgres (Week 1 / A3)
+
+SQLite was a single file — simple, but not how most real backends store data. PostgreSQL is a full database *server*, the same kind of engine powering most production applications. Running it in Docker means no manual installation or version conflicts — Postgres runs identically on any machine with Docker installed. Docker Compose ties the API and database together, so the entire stack starts with one command instead of separate manual steps.
+
+## Why Supabase Auth (this week / A4)
 
 Rolling your own authentication — password hashing, token signing, session management — is a common source of real security vulnerabilities. Supabase acts as a trusted Identity Provider: it stores accounts, hashes passwords, and issues signed JWTs. This API never touches a raw password; it only forwards credentials to Supabase and verifies the tokens Supabase issues.
 
@@ -70,6 +78,12 @@ Rolling your own authentication — password hashing, token signing, session man
 | GET    | `/protected/profile`   | Current user's profile                | Yes (Bearer token) |
 | GET    | `/protected/dashboard` | Example second protected route        | Yes (Bearer token) |
 
+## Example task request (curl)
+
+```bash
+curl -i -X POST http://localhost:8000/tasks -H "Content-Type: application/json" -d '{"title":"Buy milk"}'
+```
+
 ## Example auth flow (curl)
 
 **Sign up:**
@@ -88,12 +102,6 @@ curl -i http://localhost:8000/protected/profile -H "Authorization: Bearer <your_
 ```
 
 A tampered or expired token correctly returns `401 Unauthorized`.
-
-## Swagger UI with Bearer auth
-
-Protected routes show a padlock icon in `/docs`. Click **"Authorize"**, paste an access token (no `Bearer ` prefix needed — Swagger adds it automatically), and every protected route's "Try it out" will use it.
-
-![Swagger UI with Bearer auth](swagger-auth-screenshot.png)
 
 ## Persistence
 
@@ -123,6 +131,18 @@ docker exec -it $(docker compose ps -q db) psql -U postgres -d tasks -c "SELECT 
 ```
 
 ![Postgres data](postgres-screenshot.png)
+
+## Swagger UI (Week 2)
+
+Every endpoint is documented and testable interactively at `/docs`.
+
+![Swagger UI](Swagger%20UI.png)
+
+## Swagger UI with Bearer auth (this week)
+
+Protected routes show a padlock icon in `/docs`. Click **"Authorize"**, paste an access token (no `Bearer ` prefix needed — Swagger adds it automatically), and every protected route's "Try it out" will use it.
+
+![Swagger UI with Bearer auth](swagger-auth-screenshot.png)
 
 ## Project structure
 
