@@ -1,9 +1,13 @@
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from datetime import datetime, timezone
+from pydantic import BaseModel, ValidationError
+from typing import Optional
 import requests
 import os
 import time
+import json
+import re
 
 HEADERS = {
     "User-Agent": "FlyRankInternshipA9/1.0 (+https://github.com/Developer-AHM/flyrank-w2-crud-api)"
@@ -132,7 +136,52 @@ def scrape_all_books(book_sources):
     print(f"detail_pages={len(records)}")
     return records
 
+class BookRecord(BaseModel):
+    title: str
+    product_url: str
+    price_text: str
+    price_gbp: float
+    availability_text: str
+    rating_text: str
+    description: Optional[str] = None
+    source_page: str
+    fetched_at: str
+
+def normalize_record(raw):
+    record = dict(raw)
+
+    match = re.search(r"\d+(?:\.\d+)?", raw["price_text"])
+    record["price_gbp"] = float(match.group()) if match else None
+
+    if record["description"] is not None:
+        record["description"] = " ".join(record["description"].split())
+
+    return record
+
+def validate_and_store(raw_records):
+    good = {}
+    errors = []
+
+    for raw in raw_records:
+        clean = normalize_record(raw)
+        try:
+            book = BookRecord(**clean)
+        except ValidationError as e:
+            errors.append({"product_url": raw.get("product_url"), "reason": str(e)})
+            continue
+        good[book.product_url] = book.model_dump()
+
+    os.makedirs("output", exist_ok=True)
+    with open("output/books.json", "w", encoding="utf-8") as f:
+        json.dump(list(good.values()), f, indent=2, ensure_ascii=False)
+    with open("output/errors.json", "w", encoding="utf-8") as f:
+        json.dump(errors, f, indent=2, ensure_ascii=False)
+
+    print(f"valid={len(good)} invalid={len(errors)}")
+    return list(good.values())
+
 if __name__ == "__main__":
     book_sources = discover_all_books()
     records = scrape_all_books(book_sources)
-    print(records[0])
+    validate_and_store(records)
+    
